@@ -1,38 +1,67 @@
-// src/app/page.tsx (пример на главной)
+// src/app/page.tsx
 "use client"
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 
+type Post = {
+  id: string
+  title: string
+  content: string | null
+  author: string | null
+  created_at: string
+}
+
 export default function HomePage() {
-  const [user, setUser] = useState<any>(null)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Получаем текущую сессию
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null)
-    })
+    const fetchPosts = async () => {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("posts")
+        .select("id, title, content, author, created_at")
+        .order("created_at", { ascending: false })
 
-    // Подписка на изменения (вход/выход)
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null)
+      if (error) {
+        console.error("Ошибка загрузки:", error.message)
+      } else {
+        setPosts(data as Post[])
       }
-    )
-
-    return () => {
-      authListener.subscription.unsubscribe()
+      setLoading(false)
     }
+
+    fetchPosts()
   }, [])
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Главная страница</h1>
-      {user ? (
-        <p>Привет, {user.email} 👋</p>
+    <main className="p-6 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">Список постов</h1>
+
+      {loading ? (
+        <p>Загрузка...</p>
+      ) : posts.length === 0 ? (
+        <p>Постов пока нет.</p>
       ) : (
-        <p>Вы не авторизованы</p>
+        <div className="space-y-4">
+          {posts.map((post) => (
+            <div
+              key={post.id}
+              className="border rounded-lg p-4 shadow hover:shadow-md transition"
+            >
+              <h2 className="text-xl font-semibold">{post.title}</h2>
+              <p className="text-sm text-gray-500 mb-2">
+                Автор: {post.author || "Неизвестен"} |{" "}
+                {new Date(post.created_at).toLocaleDateString()}
+              </p>
+              <p className="text-gray-700">
+                {post.content?.slice(0, 150) || "Без содержимого"}...
+              </p>
+            </div>
+          ))}
+        </div>
       )}
-    </div>
+    </main>
   )
 }
